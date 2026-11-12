@@ -23,7 +23,7 @@ export default function Home(){
  const counts=useMemo(()=>Object.fromEntries(SYSTEMS.map(s=>[s.id,atlas?.parts.filter(p=>p.system===s.id).length??0])),[atlas]);
  const activeSystems=SYSTEMS.filter(s=>counts[s.id]>0);
  const selectedParts=state.selected.map(id=>parts.get(id)).filter(p=>!!p),selected=selectedParts[0],system=SYSTEMS.find(s=>s.id===selected?.system);
- const clinicalEntry=clinicalForPart(clinical,selected?.id,chosen?.name??selected?.name);
+ const clinicalEntry=clinicalForPart(clinical,selected?.id,chosen?.name??selected?.name,chosen?.id);
  const visibleCount=atlas?.parts.filter(p=>state.isolate?state.selected.includes(p.id):state.visible.includes(p.system)||state.selected.includes(p.id)).length??0;
  const results=useMemo(()=>{if(!atlas)return[];const term=query.toLowerCase().trim();if(!term)return ['heart','brain','liver','stomach','spleen','pancreas','urinary bladder','trachea'].map(name=>atlas.concepts.find(c=>c.name.toLowerCase()===name)).filter((x):x is Concept=>!!x);return atlas.concepts.filter(c=>c.name.toLowerCase().includes(term)||c.id.toLowerCase().includes(term)).sort((a,b)=>a.name.length-b.name.length).slice(0,80);},[atlas,query]);
  const choose=(c:Concept)=>{setChosen(c);setState(s=>({...s,selected:c.elements,isolate:false,rotate:false}));setDetails(true);setPanel(null);};
@@ -70,10 +70,10 @@ export default function Home(){
    {clinicalEntry?(
      <>
       <SheetDescription className="structure-description">{clinicalEntry.details}</SheetDescription>
-      <div className="clinical-block">
-       <h3 className="clinical-heading">Clinical correlation</h3>
-       <p className="clinical-condition"><strong>{clinicalEntry.clinicalCondition.split(' — ')[0]}</strong>{clinicalEntry.clinicalCondition.includes(' — ')?' — '+clinicalEntry.clinicalCondition.split(' — ').slice(1).join(' — '):''}</p>
-       <p className="clinical-scenario">{clinicalEntry.clinicalScenario}</p>
+      <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid #18253612'}}>
+       <h3 style={{fontSize:11,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#687786',margin:'0 0 8px'}}>Clinical correlation</h3>
+       <p style={{fontSize:14,lineHeight:1.55,color:'#364653',margin:'0 0 10px'}}><strong style={{fontWeight:600,color:'#26313c'}}>{clinicalEntry.clinicalCondition.split(' — ')[0]}</strong>{clinicalEntry.clinicalCondition.includes(' — ')?' — '+clinicalEntry.clinicalCondition.split(' — ').slice(1).join(' — '):''}</p>
+       <p style={{fontSize:13,lineHeight:1.65,color:'#66727f',margin:0,padding:'10px 12px',background:'#edf1f3',borderRadius:8}}>{clinicalEntry.clinicalScenario}</p>
       </div>
      </>
    ):(
