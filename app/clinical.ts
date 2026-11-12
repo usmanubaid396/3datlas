@@ -7,23 +7,22 @@ export interface ClinicalEntry {
   clinicalScenario: string;
 }
 
-/** Compact index: c = chunk filenames, i = part-id lists parallel to c */
 type ClinicalIndex = {
   v?: number;
   n?: number;
-  c: string[];
+  c?: string[];
   i?: string[][];
-  // legacy
   version?: number;
   count?: number;
   chunks?: string[];
 };
 
 const cache = new Map<string, ClinicalEntry>();
-const chunkCache = new Map<string, Promise<void>>();
+const chunkCache = new Map<string, Promise<boolean>>();
 let indexPromise: Promise<ClinicalIndex | null> | null = null;
 let idToChunk: Map<string, string> | null = null;
 let prefetchStarted = false;
+let singleFileLoaded = false;
 
 function getIndex(): Promise<ClinicalIndex | null> {
   if (!indexPromise) {
@@ -47,27 +46,32 @@ function getIndex(): Promise<ClinicalIndex | null> {
   return indexPromise;
 }
 
-async function loadChunk(file: string): Promise<void> {
+/** Returns true if chunk data was loaded. */
+async function loadChunk(file: string): Promise<boolean> {
   let pending = chunkCache.get(file);
   if (pending) return pending;
   pending = (async () => {
     try {
       const r = await fetch(`/models/${file}`);
-      if (!r.ok) return;
+      if (!r.ok) return false;
       const data = (await r.json()) as Record<string, ClinicalEntry>;
+      let n = 0;
       for (const [id, e] of Object.entries(data)) {
-        if (e && typeof e === 'object' && 'details' in e) cache.set(id, e);
+        if (e && typeof e === 'object' && 'details' in e) {
+          cache.set(id, e);
+          n++;
+        }
       }
+      return n > 0;
     } catch {
-      /* ignore failed chunk */
+      return false;
     }
   })();
   chunkCache.set(file, pending);
   return pending;
 }
 
-/** Load up to `limit` chunk requests at a time. */
-async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+async function mapPool(items: string[], limit: number, fn: (item: string) => Promise<boolean>): Promise<void> {
   const q = [...items];
   const workers = Array.from({ length: Math.min(limit, q.length) }, async () => {
     while (q.length) {
@@ -78,6 +82,22 @@ async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
   await Promise.all(workers);
 }
 
+async function loadSingleFile(): Promise<void> {
+  if (singleFileLoaded) return;
+  singleFileLoaded = true;
+  try {
+    const r = await fetch('/models/clinical-data.json');
+    if (!r.ok) return;
+    const extra = (await r.json()) as Record<string, ClinicalEntry>;
+    if (!extra || typeof extra !== 'object') return;
+    for (const [id, e] of Object.entries(extra)) {
+      if (e && typeof e === 'object' && 'details' in e) cache.set(id, e);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function startBackgroundPrefetch(chunks: string[]) {
   if (prefetchStarted || chunks.length === 0) return;
   prefetchStarted = true;
@@ -85,58 +105,49 @@ function startBackgroundPrefetch(chunks: string[]) {
     void mapPool(chunks, 4, loadChunk);
   };
   if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(() => run(), { timeout: 2500 });
+    requestIdleCallback(() => run(), { timeout: 3000 });
   } else {
-    setTimeout(run, 400);
+    setTimeout(run, 600);
   }
 }
 
-/**
- * Warm index + optional single-file data. Does NOT download all 71 chunks up front.
- * Returns the shared cache map (grows as chunks load).
- */
+/** Warm clinical-data.json + index. Does not block on all chunks. */
 export function loadClinicalAnatomy(): Promise<Map<string, ClinicalEntry>> {
   return (async () => {
-    // Optional single-file override (small starter set or full file if user installed it)
-    try {
-      const singleRes = await fetch('/models/clinical-data.json');
-      if (singleRes.ok) {
-        const extra = (await singleRes.json()) as Record<string, ClinicalEntry>;
-        if (extra && typeof extra === 'object') {
-          for (const [id, e] of Object.entries(extra)) {
-            if (e && typeof e === 'object' && 'details' in e) cache.set(id, e);
-          }
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
+    await loadSingleFile();
     const index = await getIndex();
     if (index) {
       const chunks = index.c ?? index.chunks ?? [];
-      // Prefetch in background with concurrency 4 — UI stays responsive
-      startBackgroundPrefetch(chunks);
+      // Only prefetch when index has id lists (chunks actually exist in deploy)
+      if (index.i && index.i.length === chunks.length && chunks.length > 0) {
+        startBackgroundPrefetch(chunks);
+      }
     }
-
     return cache;
   })();
 }
 
-/** Ensure the chunk containing this part is loaded, then resolve the entry. */
+/** Load the chunk for this part (or fall back to full scan once). */
 export async function ensureClinicalForPart(
   partId?: string,
   partName?: string,
   conceptId?: string,
 ): Promise<ClinicalEntry | null> {
+  await loadSingleFile();
+
+  // Fast path from cache
+  const hit = clinicalForPart(cache, partId, partName, conceptId);
+  if (hit) return hit;
+
   const index = await getIndex();
   if (partId && idToChunk?.has(partId)) {
     await loadChunk(idToChunk.get(partId)!);
-  } else if (index && (partName || conceptId || partId)) {
-    // Legacy index without id lists: load all chunks (bounded concurrency)
+  } else if (index) {
     const chunks = index.c ?? index.chunks ?? [];
-    if (!idToChunk || idToChunk.size === 0) {
-      await mapPool(chunks, 6, loadChunk);
+    // Only attempt chunk load if we have a real id map; otherwise clinical-data.json is the source
+    if (idToChunk && idToChunk.size > 0 && chunks.length > 0) {
+      // Unknown id: try a few early chunks then stop (avoid 71x 404)
+      await mapPool(chunks.slice(0, 8), 4, loadChunk);
     }
   }
 
