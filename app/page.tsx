@@ -15,28 +15,27 @@ const initial:SceneState={explode:0,visible:DEFAULT_VISIBLE,selected:[],isolate:
 export default function Home(){
  const detailTitle=useRef<HTMLHeadingElement>(null);
  const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(initial),[progress,setProgress]=useState(0),[error,setError]=useState(''),[panel,setPanel]=useState<'layers'|'search'|null>(null),[details,setDetails]=useState(false),[about,setAbout]=useState(false),[query,setQuery]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
- const [clinical,setClinical]=useState<Map<string,ClinicalEntry>|null>(null);
+ const [clinicalReady,setClinicalReady]=useState(false);
  const [clinicalEntry,setClinicalEntry]=useState<ClinicalEntry|null>(null);
  useEffect(()=>{const abort=new AbortController();setProgress(0);setError('');setAtlas(null);setChosen(null);setDetails(false);setState({...initial,visible:DEFAULT_VISIBLE});fetch('/models/atlas.json',{signal:abort.signal}).then(r=>{if(!r.ok)throw new Error('The anatomy catalogue could not be loaded.');return r.json();}).then(data=>setAtlas(data as Atlas)).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>abort.abort();},[]);
- useEffect(()=>{loadClinicalAnatomy().then(setClinical).catch(()=>{});},[]);
+ useEffect(()=>{loadClinicalAnatomy().then(()=>setClinicalReady(true)).catch(()=>setClinicalReady(true));},[]);
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='/'&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLTextAreaElement)){e.preventDefault();setPanel('search');setDetails(false);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
  const parts=useMemo(()=>new Map(atlas?.parts.map(p=>[p.id,p])),[atlas]);
  const counts=useMemo(()=>Object.fromEntries(SYSTEMS.map(s=>[s.id,atlas?.parts.filter(p=>p.system===s.id).length??0])),[atlas]);
  const activeSystems=SYSTEMS.filter(s=>counts[s.id]>0);
  const selectedParts=state.selected.map(id=>parts.get(id)).filter(p=>!!p),selected=selectedParts[0],system=SYSTEMS.find(s=>s.id===selected?.system);
- // Sync from cache immediately, then ensure the right chunk is loaded for this selection
+ // Resolve clinical text for current selection (lazy chunk / single-file)
  useEffect(()=>{
   const partId=selected?.id;
   const partName=chosen?.name??selected?.name;
   const conceptId=chosen?.id;
-  setClinicalEntry(clinicalForPart(clinical,partId,partName,conceptId));
+  setClinicalEntry(clinicalForPart(null,partId,partName,conceptId));
   let cancelled=false;
   ensureClinicalForPart(partId,partName,conceptId).then(entry=>{
    if(!cancelled) setClinicalEntry(entry);
-   if(clinical) setClinical(new Map(clinical));
   }).catch(()=>{});
   return()=>{cancelled=true;};
- },[selected?.id,chosen?.id,chosen?.name,clinical]);
+ },[selected?.id,chosen?.id,chosen?.name,clinicalReady]);
  const visibleCount=atlas?.parts.filter(p=>state.isolate?state.selected.includes(p.id):state.visible.includes(p.system)||state.selected.includes(p.id)).length??0;
  const results=useMemo(()=>{if(!atlas)return[];const term=query.toLowerCase().trim();if(!term)return ['heart','brain','liver','stomach','spleen','pancreas','urinary bladder','trachea'].map(name=>atlas.concepts.find(c=>c.name.toLowerCase()===name)).filter((x):x is Concept=>!!x);return atlas.concepts.filter(c=>c.name.toLowerCase().includes(term)||c.id.toLowerCase().includes(term)).sort((a,b)=>a.name.length-b.name.length).slice(0,80);},[atlas,query]);
  const choose=(c:Concept)=>{setChosen(c);setState(s=>({...s,selected:c.elements,isolate:false,rotate:false}));setDetails(true);setPanel(null);};
