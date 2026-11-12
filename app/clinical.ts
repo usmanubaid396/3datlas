@@ -7,26 +7,66 @@ export interface ClinicalEntry {
   clinicalScenario: string;
 }
 
-const EMBEDDED: Record<string, ClinicalEntry> = JSON.parse(
-  '{"FJ3176":{"name":"Atlas","id":"FJ3176","conceptId":"FMA12519","details":"First cervical vertebra; ring-shaped, lacking body and spinous process; lateral masses carry occipital condyles above and axis below; vertebral artery grooves its posterior arch.","clinicalCondition":"Jefferson burst fracture — axial load through the skull splits the ring, displacing lateral masses outward.","clinicalScenario":"A 22-year-old dives into shallow water and strikes his head; he has severe neck pain and CT shows a four-part burst fracture of C1."},"FJ3177":{"name":"Axis","id":"FJ3177","conceptId":"FMA12520","details":"Second cervical vertebra; its odontoid process (dens) projects upward and is held against the atlas by the transverse ligament, forming the pivot for head rotation.","clinicalCondition":"Odontoid fracture — elderly falls; type II fractures risk nonunion and spinal cord injury.","clinicalScenario":"An 82-year-old woman falls face-first at home; CT reveals a type II dens fracture and she is fitted with a rigid cervical collar."}}',
-);
+type ClinicalIndex = {
+  version: number;
+  count: number;
+  chunks: string[];
+  nameToIds?: Record<string, string[]>;
+};
 
 let cache: Map<string, ClinicalEntry> | null = null;
+let loading: Promise<Map<string, ClinicalEntry>> | null = null;
 
 export function loadClinicalAnatomy(): Promise<Map<string, ClinicalEntry>> {
   if (cache) return Promise.resolve(cache);
-  cache = new Map(Object.entries(EMBEDDED));
-  return fetch('/models/clinical-data.json')
-    .then(r => (r.ok ? r.json() : null))
-    .then((extra: Record<string, ClinicalEntry> | null) => {
-      if (extra && typeof extra === 'object') {
-        for (const [id, e] of Object.entries(extra)) {
-          if (e && typeof e === 'object' && 'details' in e) cache!.set(id, e as ClinicalEntry);
+  if (loading) return loading;
+
+  loading = (async () => {
+    const map = new Map<string, ClinicalEntry>();
+
+    // Prefer chunked full dataset via index
+    try {
+      const indexRes = await fetch('/models/clinical-index.json');
+      if (indexRes.ok) {
+        const index = (await indexRes.json()) as ClinicalIndex;
+        const chunks = index.chunks ?? [];
+        const maps = await Promise.all(
+          chunks.map(async name => {
+            const r = await fetch(`/models/${name}`);
+            if (!r.ok) return {} as Record<string, ClinicalEntry>;
+            return (await r.json()) as Record<string, ClinicalEntry>;
+          }),
+        );
+        for (const chunk of maps) {
+          for (const [id, e] of Object.entries(chunk)) {
+            if (e && typeof e === 'object' && 'details' in e) map.set(id, e);
+          }
         }
       }
-      return cache!;
-    })
-    .catch(() => cache!);
+    } catch {
+      /* fall through */
+    }
+
+    // Merge optional single-file override/extra
+    try {
+      const singleRes = await fetch('/models/clinical-data.json');
+      if (singleRes.ok) {
+        const extra = (await singleRes.json()) as Record<string, ClinicalEntry>;
+        if (extra && typeof extra === 'object') {
+          for (const [id, e] of Object.entries(extra)) {
+            if (e && typeof e === 'object' && 'details' in e) map.set(id, e);
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    cache = map;
+    return map;
+  })();
+
+  return loading;
 }
 
 export function clinicalForPart(
