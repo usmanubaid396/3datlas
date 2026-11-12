@@ -180,3 +180,199 @@ h1 {
     width: 240px !important;
   }
 }
+
+/* === Full professional medical LMS redesign === */
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --ring: #0d9488;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+html, body, #root, .studio {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  color: #0f172a !important;
+}
+.vignette { opacity: 0.4; }
+.glass {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06) !important;
+  border-radius: 16px !important;
+}
+
+/* Left systems panel — clean, organized */
+.layers-panel {
+  top: 88px !important;
+  bottom: 100px !important;
+  left: 20px !important;
+  width: 300px !important;
+  padding: 20px 16px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.panel-heading {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: #475569 !important;
+  margin-bottom: 4px !important;
+}
+.layer-presets {
+  background: #f1f5f9 !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  margin: 12px 0 !important;
+  border: none !important;
+}
+.layer-presets button {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  height: 32px !important;
+}
+.layer-presets button[aria-pressed="true"] {
+  background: #0d9488 !important;
+  color: white !important;
+}
+.system-list {
+  flex: 1 !important;
+  padding: 4px 0 !important;
+}
+.system-row {
+  min-height: 40px !important;
+  border-radius: 8px !important;
+  padding: 0 6px !important;
+  margin: 1px 0 !important;
+}
+.system-row:hover { background: #f8fafc !important; }
+.system-name {
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: #334155 !important;
+}
+.system-row.enabled .system-name { color: #0f172a !important; font-weight: 600 !important; }
+.system-dot { width: 8px !important; height: 8px !important; }
+.system-count {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
+  background: #f1f5f9 !important;
+  padding: 2px 6px !important;
+  border-radius: 999px !important;
+}
+
+/* Right details panel — full height, bright, readable */
+.detail-sheet {
+  top: 88px !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  width: 420px !important;
+  max-width: 420px !important;
+  height: auto !important;
+  padding: 24px 28px !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 32px rgba(15,23,42,0.1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.detail-header { padding-right: 28px !important; }
+.structure-title {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.5px !important;
+  color: #0f172a !important;
+  line-height: 1.2 !important;
+  margin: 6px 0 4px !important;
+}
+.detail-scroll {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  gap: 18px !important;
+  padding-right: 4px !important;
+}
+.structure-description {
+  font-size: 15px !important;
+  line-height: 1.65 !important;
+  color: #334155 !important;
+}
+.detail-accent {
+  width: 32px !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+  margin-bottom: 8px !important;
+}
+.detail-actions {
+  padding-top: 16px !important;
+  border-top: 1px solid #e2e8f0 !important;
+  margin-top: auto !important;
+}
+.primary-action {
+  background: #0d9488 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  min-height: 44px !important;
+}
+.primary-action:hover { background: #0f766e !important; }
+
+/* Bottom dock cleaner */
+.bottom-dock {
+  bottom: 20px !important;
+  width: 520px !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(15,23,42,0.08) !important;
+  padding: 16px 20px !important;
+}
+.explode-label { font-weight: 600 !important; color: #334155 !important; }
+
+/* Header */
+.identity { top: 20px !important; left: 20px !important; }
+h1 { font-size: 28px !important; font-weight: 800 !important; letter-spacing: -0.8px !important; color: #0f172a !important; }
+.eyebrow { font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.12em !important; color: #0d9488 !important; }
+.status-dot { background: #0d9488 !important; box-shadow: 0 0 0 3px #0d948820 !important; }
+
+/* Top actions */
+.top-actions { top: 20px !important; right: 20px !important; }
+.top-actions button {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04) !important;
+}
+
+/* View controls */
+.view-controls {
+  right: 460px !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(15,23,42,0.08) !important;
+}
+.view-controls .active {
+  background: #0d9488 !important;
+  color: white !important;
+}
+
+@media (min-width: 1400px) {
+  .detail-sheet { width: 480px !important; max-width: 480px !important; }
+  .view-controls { right: 520px !important; }
+}
+@media (max-width: 1200px) {
+  .detail-sheet { width: 360px !important; max-width: 360px !important; }
+  .layers-panel { width: 260px !important; }
+  .view-controls { right: 400px !important; }
+}
+@media (max-width: 900px) {
+  .view-controls { right: 16px !important; top: auto !important; bottom: 120px !important; transform: none !important; }
+  .detail-sheet { width: calc(100% - 32px) !important; max-width: none !important; right: 16px !important; left: 16px !important; }
+}
