@@ -7,51 +7,24 @@ export interface ClinicalEntry {
   clinicalScenario: string;
 }
 
-type ClinicalIndex = {
-  version: number;
-  count: number;
-  chunks?: string[];
-  single?: string;
-  nameToIds?: Record<string, string[]>;
-};
+const EMBEDDED: Record<string, ClinicalEntry> = JSON.parse("{\"FJ3176\":{\"name\":\"Atlas\",\"id\":\"FJ3176\",\"conceptId\":\"FMA12519\",\"details\":\"First cervical vertebra; ring-shaped, lacking body and spinous process; lateral masses carry occipital condyles above and axis below; vertebral artery grooves its posterior arch.\",\"clinicalCondition\":\"Jefferson burst fracture — axial load through the skull splits the ring, displacing lateral masses outward.\",\"clinicalScenario\":\"A 22-year-old dives into shallow water and strikes his head; he has severe neck pain and CT shows a four-part burst fracture of C1.\"},\"FJ3177\":{\"name\":\"Axis\",\"id\":\"FJ3177\",\"conceptId\":\"FMA12520\",\"details\":\"Second cervical vertebra; its odontoid process (dens) projects upward and is held against the atlas by the transverse ligament, forming the pivot for head rotation.\",\"clinicalCondition\":\"Odontoid fracture — elderly falls; type II fractures risk nonunion and spinal cord injury.\",\"clinicalScenario\":\"An 82-year-old woman falls face-first at home; CT reveals a type II dens fracture and she is fitted with a rigid cervical collar.\"}}");
 
 let cache: Map<string, ClinicalEntry> | null = null;
-let nameIndex: Record<string, string[]> = {};
-let loading: Promise<Map<string, ClinicalEntry>> | null = null;
 
 export function loadClinicalAnatomy(): Promise<Map<string, ClinicalEntry>> {
   if (cache) return Promise.resolve(cache);
-  if (loading) return loading;
-  loading = (async () => {
-    const singleRes = await fetch('/models/clinical-data.json');
-    if (singleRes.ok) {
-      const obj = (await singleRes.json()) as Record<string, ClinicalEntry>;
-      const map = new Map<string, ClinicalEntry>(Object.entries(obj));
-      cache = map;
-      return map;
-    }
-    const index = (await fetch('/models/clinical-index.json').then(r => {
-      if (!r.ok) throw new Error('Clinical anatomy index could not be loaded.');
-      return r.json();
-    })) as ClinicalIndex;
-    nameIndex = index.nameToIds ?? {};
-    const names = index.chunks ?? [];
-    const maps = await Promise.all(
-      names.map(name =>
-        fetch(`/models/${name}`).then(r => {
-          if (!r.ok) throw new Error(`Clinical anatomy chunk ${name} failed to load.`);
-          return r.json() as Promise<Record<string, ClinicalEntry>>;
-        }),
-      ),
-    );
-    const map = new Map<string, ClinicalEntry>();
-    for (const chunk of maps) {
-      for (const [id, entry] of Object.entries(chunk)) map.set(id, entry);
-    }
-    cache = map;
-    return map;
-  })();
-  return loading;
+  cache = new Map(Object.entries(EMBEDDED));
+  return fetch('/models/clinical-data.json')
+    .then(r => (r.ok ? r.json() : null))
+    .then((extra: Record<string, ClinicalEntry> | null) => {
+      if (extra && typeof extra === 'object') {
+        for (const [id, e] of Object.entries(extra)) {
+          if (e && typeof e === 'object' && 'details' in e) cache!.set(id, e as ClinicalEntry);
+        }
+      }
+      return cache!;
+    })
+    .catch(() => cache!);
 }
 
 export function clinicalForPart(
@@ -63,13 +36,6 @@ export function clinicalForPart(
   if (partId && map.has(partId)) return map.get(partId)!;
   if (partName) {
     const key = partName.toLowerCase();
-    const ids = nameIndex[key];
-    if (ids) {
-      for (const id of ids) {
-        const e = map.get(id);
-        if (e) return e;
-      }
-    }
     for (const e of map.values()) {
       if (e.name.toLowerCase() === key) return e;
     }
